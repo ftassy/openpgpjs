@@ -103,6 +103,8 @@ export async function generate(options, config) {
  * @param {Number} options.keyExpirationTime      Number of seconds from the key creation time after which the key expires
  * @param {Date}   options.date                   Override the creation date of the key signatures
  * @param {Array<Object>} options.subkeys         (optional) options for each subkey, default to main key options. e.g. [{sign: true, passphrase: '123'}]
+ * @param {Array<Array<Object>>} [options.signatureNotations=[]] - (optional) Array containing one array of notations per user ID to add to the self-certification signatures, 
+ *                                                                 e.g. `[[{ name: 'test@example.com', value: new  TextEncoder().encode('test'), humanReadable: true, critical: false }]]`
  * @param {Object} config - Full configuration
  *
  * @returns {Promise<{{ key: PrivateKey, revocationCertificate: String }}>}
@@ -260,8 +262,11 @@ async function wrapKeyObject(secretKeyPacket, secretSubkeyPackets, options, conf
     if (index === 0) {
       signatureProperties.isPrimaryUserID = true;
     }
-
-    const signaturePacket = await helper.createSignaturePacket(dataToSign, [], secretKeyPacket, signatureProperties, options.date, undefined, undefined, undefined, config);
+    let signatureNotations = [];
+    if (options.signatureNotations && options.signatureNotations.length > 0) {
+      signatureNotations = options.signatureNotations[index];
+    }
+    const signaturePacket = await helper.createSignaturePacket(dataToSign, [], secretKeyPacket, signatureProperties, options.date, undefined, signatureNotations, undefined, config);
 
     return { userIDPacket, signaturePacket };
   })).then(list => {

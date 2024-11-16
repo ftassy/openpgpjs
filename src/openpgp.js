@@ -100,13 +100,15 @@ export async function generateKey({ userIDs = [], passphrase, type, curve, rsaBi
  * @param {Date}   [options.date] - Override the creation date of the key signatures. If the key was previously used to sign messages, it is recommended
  *                                  to set the same date as the key creation time to ensure that old message signatures will still be verifiable using the reformatted key.
  * @param {'armored'|'binary'|'object'} [options.format='armored'] - format of the output keys
+ * @param {Array<Array<Object>>} [options.signatureNotations=[]] - Array containing one array of notations per user ID to add to the self-certification signatures, 
+ *                                                                 e.g. `[[{ name: 'test@example.com', value: new TextEncoder().encode('test'), humanReadable: true, critical: false }]]`
  * @param {Object} [options.config] - Custom configuration settings to overwrite those in [config]{@link module:config}
  * @returns {Promise<Object>} The generated key object in the form:
  *                                     { privateKey:PrivateKey|Uint8Array|String, publicKey:PublicKey|Uint8Array|String, revocationCertificate:String }
  * @async
  * @static
  */
-export async function reformatKey({ privateKey, userIDs = [], passphrase, keyExpirationTime = 0, date, format = 'armored', config, ...rest }) {
+export async function reformatKey({ privateKey, userIDs = [], passphrase, keyExpirationTime = 0, date, format = 'armored', signatureNotations = [], config, ...rest }) {
   config = { ...defaultConfig, ...config }; checkConfig(config);
   userIDs = toArray(userIDs);
   const unknownOptions = Object.keys(rest); if (unknownOptions.length > 0) throw new Error(`Unknown option: ${unknownOptions.join(', ')}`);
@@ -114,7 +116,10 @@ export async function reformatKey({ privateKey, userIDs = [], passphrase, keyExp
   if (userIDs.length === 0 && privateKey.keyPacket.version !== 6) {
     throw new Error('UserIDs are required for V4 keys');
   }
-  const options = { privateKey, userIDs, passphrase, keyExpirationTime, date };
+  if (signatureNotations.length > 0 && signatureNotations.length !== userIDs.length) {
+    throw new Error(`The number of signature notations arrays (${signatureNotations.length}), should be 0 or the same as number of userIDs: ${userIDs.length}`);
+  }
+  const options = { privateKey, userIDs, passphrase, keyExpirationTime, date, signatureNotations };
 
   try {
     const { key: reformattedKey, revocationCertificate } = await reformat(options, config);

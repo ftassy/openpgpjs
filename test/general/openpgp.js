@@ -1228,6 +1228,48 @@ PIQe3UJEj7ReaAd2LBkk3XXkg74zfts7GAGdNtWgXQEAwYQJdVChJFU3LRNh
       expect(privateKey.isPrivate()).to.be.true;
       expect(publicKey.isPrivate()).to.be.false;
     });
+  
+    it('should reformat keypair with signature notations', async function() {
+      const encryptedKey = await openpgp.readKey({ armoredKey: priv_key });
+      const original = await openpgp.decryptKey({
+        privateKey: encryptedKey,
+        passphrase: passphrase
+      });
+
+      const opt = {
+        privateKey: original,
+        userIDs: { name: 'Test User', email: 'text@example.com' },
+        signatureNotations: [
+            [
+            { name: 'notation@example.com', value: new TextEncoder().encode('Notation value'), humanReadable: true, critical: false },
+            { name: 'other-notation@example.com', value: new TextEncoder().encode('Other notation value'), humanReadable: true, critical: false }
+          ]
+        ],
+      };
+
+      const armored = await openpgp.reformatKey({ ...opt, format: 'armored' });
+      const reformattedKey = await openpgp.readKey({ armoredKey: armored.publicKey });
+      
+      expect(reformattedKey.users.length).to.equal(1);
+      expect(reformattedKey.users[0].selfCertifications.length).to.equal(1);
+
+      const selfCertification = reformattedKey.users[0].selfCertifications[0];
+      expect(selfCertification.rawNotations.length).to.equal(3);
+      
+      expect(selfCertification.rawNotations[0]['name']).to.equal('notation@example.com');
+      expect(util.decodeUTF8(selfCertification.rawNotations[0]['value'])).to.equal('Notation value');
+      expect(selfCertification.rawNotations[0]['humanReadable']).to.be.true;
+      expect(selfCertification.rawNotations[0]['critical']).to.be.false;
+      
+      expect(selfCertification.rawNotations[1]['name']).to.equal('other-notation@example.com');
+      expect(util.decodeUTF8(selfCertification.rawNotations[1]['value'])).to.equal('Other notation value');
+      expect(selfCertification.rawNotations[1]['humanReadable']).to.be.true;
+      expect(selfCertification.rawNotations[1]['critical']).to.be.false;
+
+      expect(selfCertification.rawNotations[2]['name']).to.equal('salt@notations.openpgpjs.org');
+      expect(selfCertification.rawNotations[2]['humanReadable']).to.be.false;
+      expect(selfCertification.rawNotations[2]['critical']).to.be.false;
+    });
   });
 
   describe('revokeKey - unit tests', function() {
